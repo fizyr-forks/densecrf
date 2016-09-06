@@ -24,27 +24,8 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#pragma once
 
-#include "util.h"
-#include <cstring>
-
-float* allocate(size_t N) {
-	float * r = NULL;
-	if (N>0)
-#ifdef SSE_DENSE_CRF
-		r = (float*)_mm_malloc( N*sizeof(float)+16, 16 );
-#else
-		r = new float[N];
-#endif
-	memset( r, 0, sizeof(float)*N);
-	return r;
-}
-void deallocate(float*& ptr) {
-	if (ptr)
-#ifdef SSE_DENSE_CRF
-		_mm_free( ptr );
-#else
-		delete[] ptr;
-#endif
-	ptr = NULL;
-}
+#include "densecrf.h"
+VectorXs getLabeling( const unsigned char * im, int N, int M );
+unsigned char * colorize( const VectorXs & labeling, int W, int H );

@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2011, Philipp Krähenbühl
+    Copyright (c) 2013, Philipp Krähenbühl
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -27,61 +27,28 @@
 #include "densecrf.h"
 #include <cstdio>
 #include <cmath>
-#include "util.h"
-
-// Store the colors we read, so that we can write them again.
-int nColors = 0;
-int colors[255];
-unsigned int getColor( const unsigned char * c ){
-	return c[0] + 256*c[1] + 256*256*c[2];
-}
-void putColor( unsigned char * c, unsigned int cc ){
-	c[0] = cc&0xff; c[1] = (cc>>8)&0xff; c[2] = (cc>>16)&0xff;
-}
-// Produce a color image from a bunch of labels
-unsigned char * colorize( const short * map, int W, int H ){
-	unsigned char * r = new unsigned char[ W*H*3 ];
-	for( int k=0; k<W*H; k++ ){
-		int c = colors[ map[k] ];
-		putColor( r+3*k, c );
-	}
-	return r;
-}
+#include "ppm.h"
+#include "common.h"
 
 // Certainty that the groundtruth is correct
 const float GT_PROB = 0.5;
 
 // Simple classifier that is 50% certain that the annotation is correct
-float * classify( const unsigned char * im, int W, int H, int M ){
-	const float u_energy = -log( 1.0f / M );
-	const float n_energy = -log( (1.0f - GT_PROB) / (M-1) );
+MatrixXf computeUnary( const VectorXs & lbl, int M ){
+	const float u_energy = -log( 1.0 / M );
+	const float n_energy = -log( (1.0 - GT_PROB) / (M-1) );
 	const float p_energy = -log( GT_PROB );
-	float * res = new float[W*H*M];
-	for( int k=0; k<W*H; k++ ){
-		// Map the color to a label
-		int c = getColor( im + 3*k );
-		int i;
-		for( i=0;i<nColors && c!=colors[i]; i++ );
-		if (c && i==nColors){
-			if (i<M)
-				colors[nColors++] = c;
-			else
-				c=0;
-		}
-		
+	MatrixXf r( M, lbl.rows() );
+	r.fill(u_energy);
+	//printf("%d %d %d \n",im[0],im[1],im[2]);
+	for( int k=0; k<lbl.rows(); k++ ){
 		// Set the energy
-		float * r = res + k*M;
-		if (c){
-			for( int j=0; j<M; j++ )
-				r[j] = n_energy;
-			r[i] = p_energy;
-		}
-		else{
-			for( int j=0; j<M; j++ )
-				r[j] = u_energy;
+		if (lbl[k]>=0){
+			r.col(k).fill( n_energy );
+			r(lbl[k],k) = p_energy;
 		}
 	}
-	return res;
+	return r;
 }
 
 int main( int argc, char* argv[]){
@@ -109,7 +76,7 @@ int main( int argc, char* argv[]){
 	}
 	
 	/////////// Put your own unary classifier here! ///////////
-	float * unary = classify( anno, W, H, M );
+	MatrixXf unary = computeUnary( getLabeling( anno, W*H, M ), M );
 	///////////////////////////////////////////////////////////
 	
 	// Setup the CRF model
@@ -121,18 +88,23 @@ int main( int argc, char* argv[]){
 	// x_stddev = 3
 	// y_stddev = 3
 	// weight = 3
-	crf.addPairwiseGaussian( 3, 3, 3 );
+	crf.addPairwiseGaussian( 3, 3, new PottsCompatibility( 3 ) );
 	// add a color dependent term (feature = xyrgb)
 	// x_stddev = 60
 	// y_stddev = 60
 	// r_stddev = g_stddev = b_stddev = 20
 	// weight = 10
-	crf.addPairwiseBilateral( 60, 60, 20, 20, 20, im, 10 );
+	crf.addPairwiseBilateral( 80, 80, 13, 13, 13, im, new PottsCompatibility( 10 ) );
 	
 	// Do map inference
-	short * map = new short[W*H];
-	crf.map(10, map);
-	
+// 	MatrixXf Q = crf.startInference(), t1, t2;
+// 	printf("kl = %f\n", crf.klDivergence(Q) );
+// 	for( int it=0; it<5; it++ ) {
+// 		crf.stepInference( Q, t1, t2 );
+// 		printf("kl = %f\n", crf.klDivergence(Q) );
+// 	}
+// 	VectorXs map = crf.currentMap(Q);
+	VectorXs map = crf.map(5);
 	// Store the result
 	unsigned char *res = colorize( map, W, H );
 	writePPM( argv[3], W, H, res );
@@ -140,6 +112,4 @@ int main( int argc, char* argv[]){
 	delete[] im;
 	delete[] anno;
 	delete[] res;
-	delete[] map;
-	delete[] unary;
 }

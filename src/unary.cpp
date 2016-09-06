@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2011, Philipp Krähenbühl
+    Copyright (c) 2013, Philipp Krähenbühl
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -24,26 +24,45 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "permutohedral.h"
-#include "densecrf.h"
+#include "unary.h"
 
 
-Filter::Filter( const float * source_features, int N_source, const float * target_features, int N_target, int feature_dim ):n1_(N_source),o1_(0),n2_(N_target), o2_(N_source){
-    permutohedral_ = new Permutohedral();
-    float * features = new float[ (N_source+N_target)*feature_dim ];
-    memcpy( features, source_features, N_source*feature_dim*sizeof(float) );
-    memcpy( features+N_source*feature_dim, target_features, N_target*feature_dim*sizeof(float) );
-    permutohedral_->init( features, feature_dim, N_source+N_target );
-    delete[] features;
+UnaryEnergy::~UnaryEnergy() {
 }
-Filter::Filter( const float * features, int N, int feature_dim ):n1_(N),o1_(0),n2_(N), o2_(0){
-    permutohedral_ = new Permutohedral();
-    permutohedral_->init( features, feature_dim, N );
+VectorXf UnaryEnergy::parameters() const {
+	return VectorXf();
 }
-Filter::~Filter(){
-    delete permutohedral_;
+void UnaryEnergy::setParameters( const VectorXf & v ) {
 }
-void Filter::filter( const float * source, float * target, int value_size ){
-    permutohedral_->compute( target, source, value_size, o1_, o2_, n1_, n2_ );
+VectorXf UnaryEnergy::gradient( const MatrixXf & b ) const {
+	return VectorXf();
 }
 
+
+ConstUnaryEnergy::ConstUnaryEnergy( const MatrixXf & u ):unary_(u) {
+}
+MatrixXf ConstUnaryEnergy::get() const {
+	return unary_;
+}
+
+LogisticUnaryEnergy::LogisticUnaryEnergy( const MatrixXf & L, const MatrixXf & f ):L_(L),f_(f) {
+}
+MatrixXf LogisticUnaryEnergy::get() const {
+	return L_*f_;
+}
+VectorXf LogisticUnaryEnergy::parameters() const {
+	MatrixXf l = L_;
+	l.resize( l.cols()*l.rows(), 1 );
+	return l;
+}
+void LogisticUnaryEnergy::setParameters( const VectorXf & v ) {
+	assert( v.rows() == L_.cols()*L_.rows() );
+	MatrixXf l = v;
+	l.resizeLike( L_ );
+	L_ = l;
+}
+VectorXf LogisticUnaryEnergy::gradient( const MatrixXf & b ) const {
+	MatrixXf g = b*f_.transpose();
+	g.resize( g.cols()*g.rows(), 1 );
+	return g;
+}

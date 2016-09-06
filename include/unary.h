@@ -24,27 +24,34 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#pragma once
+#include <Eigen/Core>
+using namespace Eigen;
 
-#include "util.h"
-#include <cstring>
-
-float* allocate(size_t N) {
-	float * r = NULL;
-	if (N>0)
-#ifdef SSE_DENSE_CRF
-		r = (float*)_mm_malloc( N*sizeof(float)+16, 16 );
-#else
-		r = new float[N];
-#endif
-	memset( r, 0, sizeof(float)*N);
-	return r;
-}
-void deallocate(float*& ptr) {
-	if (ptr)
-#ifdef SSE_DENSE_CRF
-		_mm_free( ptr );
-#else
-		delete[] ptr;
-#endif
-	ptr = NULL;
-}
+class UnaryEnergy {
+public:
+	virtual ~UnaryEnergy();
+	// Set the unary
+	virtual MatrixXf get( ) const = 0;
+	// Gradient computation
+	virtual VectorXf parameters() const;
+	virtual void setParameters( const VectorXf & v );
+	virtual VectorXf gradient( const MatrixXf & b ) const;
+};
+class ConstUnaryEnergy: public UnaryEnergy {
+protected:
+	MatrixXf unary_;
+public:
+	ConstUnaryEnergy( const MatrixXf & unary );
+	virtual MatrixXf get( ) const;
+};
+class LogisticUnaryEnergy: public UnaryEnergy {
+protected:
+	MatrixXf L_, f_;
+public:
+	LogisticUnaryEnergy( const MatrixXf & L, const MatrixXf & feature );
+	virtual MatrixXf get( ) const;
+	virtual VectorXf parameters() const;
+	virtual void setParameters( const VectorXf & v );
+	virtual VectorXf gradient( const MatrixXf & b ) const;
+};

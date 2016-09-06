@@ -24,27 +24,40 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-#include "util.h"
+#pragma once
+#include <cstdlib>
+#include <vector>
 #include <cstring>
+#include <cassert>
+#include <cstdio>
+#include <cmath>
+#include <Eigen/Core>
+using namespace Eigen;
 
-float* allocate(size_t N) {
-	float * r = NULL;
-	if (N>0)
-#ifdef SSE_DENSE_CRF
-		r = (float*)_mm_malloc( N*sizeof(float)+16, 16 );
-#else
-		r = new float[N];
-#endif
-	memset( r, 0, sizeof(float)*N);
-	return r;
-}
-void deallocate(float*& ptr) {
-	if (ptr)
-#ifdef SSE_DENSE_CRF
-		_mm_free( ptr );
-#else
-		delete[] ptr;
-#endif
-	ptr = NULL;
-}
+/************************************************/
+/***          Permutohedral Lattice           ***/
+/************************************************/
+
+class Permutohedral
+{
+protected:
+	struct Neighbors{
+		int n1, n2;
+		Neighbors( int n1=0, int n2=0 ):n1(n1),n2(n2){
+		}
+	};
+	std::vector<int> offset_, rank_;
+	std::vector<float> barycentric_;
+	std::vector<Neighbors> blur_neighbors_;
+	// Number of elements, size of sparse discretized space, dimension of features
+	int N_, M_, d_;
+	void sseCompute ( float* out, const float* in, int value_size, bool reverse=false ) const;
+	void seqCompute ( float* out, const float* in, int value_size, bool reverse=false ) const;
+public:
+	Permutohedral();
+	void init ( const MatrixXf & features );
+	MatrixXf compute ( const MatrixXf & v, bool reverse=false ) const;
+	void compute ( MatrixXf & out, const MatrixXf & in, bool reverse=false ) const;
+	// Compute the gradient of a^T K b
+	void gradient ( float* df, const float * a, const float* b, int value_size ) const;
+};

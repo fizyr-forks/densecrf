@@ -24,27 +24,17 @@
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#pragma once
+#include <Eigen/Core>
+using namespace Eigen;
 
-#include "util.h"
-#include <cstring>
-
-float* allocate(size_t N) {
-	float * r = NULL;
-	if (N>0)
-#ifdef SSE_DENSE_CRF
-		r = (float*)_mm_malloc( N*sizeof(float)+16, 16 );
-#else
-		r = new float[N];
-#endif
-	memset( r, 0, sizeof(float)*N);
-	return r;
-}
-void deallocate(float*& ptr) {
-	if (ptr)
-#ifdef SSE_DENSE_CRF
-		_mm_free( ptr );
-#else
-		delete[] ptr;
-#endif
-	ptr = NULL;
-}
+class EnergyFunction {
+public:
+	virtual VectorXf initialValue() = 0;
+	virtual double gradient( const VectorXf & x, VectorXf & dx ) = 0;
+};
+VectorXf minimizeLBFGS( EnergyFunction & efun, int restart=0, bool verbose=false );
+VectorXf numericGradient( EnergyFunction & efun, const VectorXf & x, float EPS=1e-3 );
+VectorXf gradient( EnergyFunction & efun, const VectorXf & x );
+double gradCheck( EnergyFunction & efun, const VectorXf & x, float EPS=1e-3 );
+VectorXf computeFunction( EnergyFunction & efun, const VectorXf & x, const VectorXf & dx, int n_samples = 100 );
