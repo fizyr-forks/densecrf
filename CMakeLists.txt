@@ -3,8 +3,14 @@ project(densecrf)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 
-include_directories( include )
+find_package(Eigen3 REQUIRED)
+find_package(lbfgs REQUIRED)
 
-add_subdirectory (src)
-add_subdirectory (examples)
-add_subdirectory (external)
+include_directories(
+	include
+	${EIGEN3_INCLUDE_DIRS}
+	${lbfgs_INCLUDE_DIRS}
+)
+
+add_subdirectory(src)
+add_subdirectory(examples)
